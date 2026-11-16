@@ -1,0 +1,35 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: bedflow
+      POSTGRES_USER: bedflow
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-bedflow}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bedflow"]
+      interval: 5s
+      retries: 10
+
+  api:
+    build: ./server
+    restart: unless-stopped
+    depends_on: { db: { condition: service_healthy } }
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://bedflow:${DB_PASSWORD:-bedflow}@db:5432/bedflow
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET (32+ chars) in .env}
+      CORS_ORIGIN: ${PUBLIC_URL:-http://localhost:8080}
+      APP_TIMEZONE: ${APP_TIMEZONE:-Asia/Dubai}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:-admin@bedflow.local}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:-ChangeMe123!}
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    depends_on: [api]
+    ports: ["8080:80"]
+
+volumes:
+  pgdata:
